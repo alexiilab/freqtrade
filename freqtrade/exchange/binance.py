@@ -39,7 +39,7 @@ class Binance(Exchange):
     Binance exchange.
     """
     # Base URL and API endpoints
-    # BASE_URL: str = 'https://www.bittrex.com'
+    BASE_URL: str = 'https://www.binance.com'
     # PAIR_DETAIL_METHOD: str = BASE_URL + '/Market/Index'
 
     def __init__(self, config: dict) -> None:
@@ -67,6 +67,14 @@ class Binance(Exchange):
 
 
         self.cached_ticker = {}
+        #init pair name conversion hashes
+        # freqtrade use XXX_YYY and binance use XXXYYY
+        self.ft2bin_pair_name = {}
+        self.bin2ft_pair_name = {}
+        for s in _API.exchange_info()['symbols']:
+            self.ft2bin_pair_name[s['symbol']] = "{}_{}".format(s['baseAsset'], s['quoteAsset'])
+            self.bin2ft_pair_name["{}_{}".format(s['baseAsset'], s['quoteAsset'])] = [s['symbol']]
+
 
     @staticmethod
     def _validate_response(response) -> None:
@@ -82,54 +90,26 @@ class Binance(Exchange):
         #     raise ContentDecodingError('Got {}'.format(response['message']))
         return
 
+
     @property
     def fee(self) -> float:
         # 0.05 %: See https://www.binance.com/fees.html
         return 0.0005
-
+#done
     def buy(self, pair: str, rate: float, amount: float) -> str:
-    	# data = _API.buy_limit(pair.replace('_', '-'), amount, rate)
-        # if not data['success']:
-        #     Bittrex._validate_response(data)
-        #     raise OperationalException('{message} params=({pair}, {rate}, {amount})'.format(
-        #         message=data['message'],
-        #         pair=pair,
-        #         rate=rate,
-        #         amount=amount))
-        data = _API.order_limit_buy(symbol=pair.replace('_',''), quantity=amount, price=rate )
+        data = _API.order_limit_buy(symbol=self.ft2bin_pair_name(pair), quantity=amount, price=rate )
         return data['clientOrderId']
-
+#done
     def sell(self, pair: str, rate: float, amount: float) -> str:
-        # data = _API.sell_limit(pair.replace('_', '-'), amount, rate)
-        # if not data['success']:
-        #     Bittrex._validate_response(data)
-        #     raise OperationalException('{message} params=({pair}, {rate}, {amount})'.format(
-        #         message=data['message'],
-        #         pair=pair,
-        #         rate=rate,
-        #         amount=amount))
-        # return data['result']['uuid']
-        data = _API.order_limit_sell(symbol=pair.replace('_',''), quantity=amount, price=rate)
+        data = _API.order_limit_sell(symbol=self.ft2bin_pair_name(pair), quantity=amount, price=rate)
 
-
+#done
     def get_balance(self, currency: str) -> float:
-        # data = _API.get_balance(currency)
-        # if not data['success']:
-        #     Bittrex._validate_response(data)
-        #     raise OperationalException('{message} params=({currency})'.format(
-        #         message=data['message'],
-        #         currency=currency))
-        # return float(data['result']['Balance'] or 0.0)
         data = _API.get_asset_balance(asset=currency)
         return float(data['free'])
 
-
+#done
     def get_balances(self):
-        # data = _API.get_balances()
-        # if not data['success']:
-        #     Bittrex._validate_response(data)
-        #     raise OperationalException('{message}'.format(message=data['message']))
-        # return data['result']
         data = _API.get_account()
         r = []
         for b in data['balances']:
@@ -142,21 +122,7 @@ class Binance(Exchange):
 
     def get_ticker(self, pair: str, refresh: Optional[bool] = True) -> dict:
         if refresh or pair not in self.cached_ticker.keys():
-            # data = _API.get_ticker(pair.replace('_', '-'))
-            # if not data['success']:
-            #     Bittrex._validate_response(data)
-            #     raise OperationalException('{message} params=({pair})'.format(
-            #         message=data['message'],
-            #         pair=pair))
-            # keys = ['Bid', 'Ask', 'Last']
-            # if not data.get('result') or\
-            #         not all(key in data.get('result', {}) for key in keys) or\
-            #         not all(data.get('result', {})[key] is not None for key in keys):
-            #     raise ContentDecodingError('{message} params=({pair})'.format(
-            #         message='Got invalid response from bittrex',
-            #         pair=pair))
-            # # Update the pair
-            data = _API.get_ticker(symbol=pair.replace('_',''))
+            data = _API.get_ticker(symbol=self.ft2bin_pair_name(pair))
             self.cached_ticker[pair] = {
                 'bid': float(data['bidPrice']),
                 'ask': float(data['askPrice']),
@@ -178,7 +144,7 @@ class Binance(Exchange):
         else:
             raise ValueError('Cannot parse tick_interval: {}'.format(tick_interval))
 
-        klines = _API.get_klines(symbol = pair.replace('_',''), interval = interval)
+        klines = _API.get_klines(symbol = self.ft2bin_pair_name(pair) , interval = interval)
         r = []
         for kl in klines:
         	r.append({
@@ -193,7 +159,8 @@ class Binance(Exchange):
 
 
         return r
-//todo here
+
+##todo here
     def get_order(self, order_id: str) -> Dict:
         #    :return: dict, format: {
         #     'id': str,
@@ -207,7 +174,7 @@ class Binance(Exchange):
         # }
         data = _API.get_order()
         
-
+#todo
     def cancel_order(self, order_id: str) -> None:
         data = _API.cancel(order_id)
         if not data['success']:
@@ -216,31 +183,48 @@ class Binance(Exchange):
                 message=data['message'],
                 order_id=order_id))
 
+#done
     def get_pair_detail_url(self, pair: str) -> str:
-        return self.PAIR_DETAIL_METHOD + '?MarketName={}'.format(pair.replace('_', '-'))
+        return self.BASE_URL + 'trade.html?symbol={}'.format(pair)
 
+
+#done
     def get_markets(self) -> List[str]:
-        data = _API.get_markets()
-        if not data['success']:
-            Bittrex._validate_response(data)
-            raise OperationalException('{message}'.format(message=data['message']))
-        return [m['MarketName'].replace('-', '_') for m in data['result']]
+        data = _API.get_exchange_info()
+        return [self.bin2ft_pair_name(s['symbol']) for s in data['symbols']]
+
 
     def get_market_summaries(self) -> List[Dict]:
-        data = _API.get_market_summaries()
-        if not data['success']:
-            Bittrex._validate_response(data)
-            raise OperationalException('{message}'.format(message=data['message']))
-        return data['result']
+        data = _API.get_ticker()
+        r = []
+        for s in data:
+            r.append(
+                {
+                'MarketName': self.bin2ft_pair_name(s['symbol']),
+                'High': s['highPrice'],
+                'Low': s['lowPrice'],
+                'Volume': s['volume'],
+                'Last': s['lastPrice'],
+                'TimeStamp': datetime.datetime.fromtimestamp(s[closeTime]//1000.0),,
+                'BaseVolume': s['quoteVolume'],
+                'Bid': s['bidPrice'],
+                'Ask': s['askPrice'],
+                'OpenBuyOrders': 0,   # todo
+                'OpenSellOrders': 0,  #todo
+                'PrevDay': 0,  #todo
+                'Created': datetime.datetime(2017,7,1,0,0) #todo
+                }
+                )
+        return r
 
     def get_wallet_health(self) -> List[Dict]:
-        data = _API_V2.get_wallet_health()
-        if not data['success']:
-            Bittrex._validate_response(data)
-            raise OperationalException('{message}'.format(message=data['message']))
-        return [{
-            'Currency': entry['Health']['Currency'],
-            'IsActive': entry['Health']['IsActive'],
-            'LastChecked': entry['Health']['LastChecked'],
-            'Notice': entry['Currency'].get('Notice'),
-        } for entry in data['result']]
+#todo : dont fake results
+        data = _API.get_exchange_info()
+        return[{
+            'Currency': s['baseAsset'],
+            'IsActive': True,
+            'LastChecked': str(datetime.now()),
+            'Notice': "",
+        } for s in data]
+
+
