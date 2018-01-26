@@ -94,7 +94,7 @@ class Exchange(ABC):
         ]
         """
 
-    def get_order(self, order_id: str) -> Dict:
+    def get_order(self, order_id: str, pair: str) -> Dict:
         """
         Get order details for the given order_id.
         :param order_id: ID as str
@@ -111,7 +111,7 @@ class Exchange(ABC):
         """
 
     @abstractmethod
-    def cancel_order(self, order_id: str) -> None:
+    def cancel_order(self, order_id: str, pair: str) -> None:
         """
         Cancels order for given order_id.
         :param order_id: ID as str

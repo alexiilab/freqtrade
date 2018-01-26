@@ -174,7 +174,7 @@ class Bittrex(Exchange):
 
         return data['result']
 
-    def get_order(self, order_id: str) -> Dict:
+    def get_order(self, order_id: str, pair: str) -> Dict:
         data = _API.get_order(order_id)
         if not data['success']:
             Bittrex._validate_response(data)
@@ -193,7 +193,7 @@ class Bittrex(Exchange):
             'closed': data['Closed'],
         }
 
-    def cancel_order(self, order_id: str) -> None:
+    def cancel_order(self, order_id: str, pair: str) -> None:
         data = _API.cancel(order_id)
         if not data['success']:
             Bittrex._validate_response(data)

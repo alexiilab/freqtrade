@@ -40,27 +40,8 @@ class Binance(Exchange):
     """
     # Base URL and API endpoints
     BASE_URL: str = 'https://www.binance.com'
-    # PAIR_DETAIL_METHOD: str = BASE_URL + '/Market/Index'
 
-    def __init__(self, config: dict) -> None:
-        # global _API, _API_V2, _EXCHANGE_CONF
-
-        # _EXCHANGE_CONF.update(config)
-        # _API = _Bittrex(
-        #     api_key=_EXCHANGE_CONF['key'],
-        #     api_secret=_EXCHANGE_CONF['secret'],
-        #     calls_per_second=1,
-        #     api_version=API_V1_1,
-        #     dispatch=custom_requests
-        # )
-        # _API_V2 = _Bittrex(
-        #     api_key=_EXCHANGE_CONF['key'],
-        #     api_secret=_EXCHANGE_CONF['secret'],
-        #     calls_per_second=1,
-        #     api_version=API_V2_0,
-        #     dispatch=custom_requests
-        # )
-        
+    def __init__(self, config: dict) -> None:        
         global	_API, _EXCHANGE_CONF
         _EXCHANGE_CONF.update(config)
         _API = _Binance(api_key, api_secret)
@@ -72,23 +53,8 @@ class Binance(Exchange):
         self.ft2bin_pair_name = {}
         self.bin2ft_pair_name = {}
         for s in _API.exchange_info()['symbols']:
-            self.ft2bin_pair_name[s['symbol']] = "{}_{}".format(s['baseAsset'], s['quoteAsset'])
-            self.bin2ft_pair_name["{}_{}".format(s['baseAsset'], s['quoteAsset'])] = [s['symbol']]
-
-
-    @staticmethod
-    def _validate_response(response) -> None:
-        """
-        Validates the given bittrex response
-        and raises a ContentDecodingError if a non-fatal issue happened.
-        """
-        # temp_error_messages = [
-        #     'NO_API_RESPONSE',
-        #     'MIN_TRADE_REQUIREMENT_NOT_MET',
-        # ]
-        # if response['message'] in temp_error_messages:
-        #     raise ContentDecodingError('Got {}'.format(response['message']))
-        return
+            self.ft2bin_pair_name[s['symbol']] = "{}_{}".format(s['quoteAsset'], s['baseAsset'])
+            self.bin2ft_pair_name["{}_{}".format(s['quoteAsset'], s['baseAsset'])] = [s['symbol']]
 
 
     @property
@@ -109,7 +75,7 @@ class Binance(Exchange):
         return float(data['free'])
 
 #done
-    def get_balances(self):
+    def get_balances(self) -> List[Dict]:
         data = _API.get_account()
         r = []
         for b in data['balances']:
@@ -161,7 +127,7 @@ class Binance(Exchange):
         return r
 
 ##todo here
-    def get_order(self, order_id: str) -> Dict:
+    def get_order(self, order_id: str, pair: str) -> Dict:
         #    :return: dict, format: {
         #     'id': str,
         #     'type': str,
@@ -172,10 +138,20 @@ class Binance(Exchange):
         #     'amount': float,
         #     'remaining': int
         # }
-        data = _API.get_order()
+        data = _API.get_order( symbol=self.ft2bin_pair_name(pair), orderId=order_id)
+        return {
+                'id': data['orderId'],
+                'type': data['type'],
+                'pair': self.bin2ft_pair_name(data['symbol']),
+                'opened': str ISO 8601 datetime,
+                'closed': str ISO 8601 datetime,
+                'rate': float,
+                'amount': float,
+                'remaining': int
+        }
         
 #todo
-    def cancel_order(self, order_id: str) -> None:
+    def cancel_order(self, order_id: str, pair: str) -> None:
         data = _API.cancel(order_id)
         if not data['success']:
             Bittrex._validate_response(data)
@@ -205,7 +181,7 @@ class Binance(Exchange):
                 'Low': s['lowPrice'],
                 'Volume': s['volume'],
                 'Last': s['lastPrice'],
-                'TimeStamp': datetime.datetime.fromtimestamp(s[closeTime]//1000.0),,
+                'TimeStamp': datetime.datetime.fromtimestamp(s[closeTime]//1000.0),
                 'BaseVolume': s['quoteVolume'],
                 'Bid': s['bidPrice'],
                 'Ask': s['askPrice'],
